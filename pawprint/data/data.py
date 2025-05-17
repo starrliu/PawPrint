@@ -1,0 +1,146 @@
+"""TrajectoryData class for loading and further processing.
+
+TrajectoryData class is used to load trajectory data from files.
+Once loaded, it can be used to process the data for further analysis.
+Trajectory data with idtracker.ai format and timestamp data are required.
+
+Typical usage example:
+    trajectory_data = TrajectoryData(trajectory_path='path/to/trajectory.csv',
+                                      timestamp_path='path/to/timestamps.csv')
+"""
+
+import pandas as pd
+import numpy as np
+
+
+class Trajectory:
+    """Trajectory class for loading and further processing."""
+
+    def __init__(self, trajectory_data: pd.DataFrame, identity: int, fps: int):
+        self.identity = identity
+        self.fps = fps
+        # Check the trajectory_data format
+        self._check_format(trajectory_data)
+        # Store the trajectory data
+        self.trajectory_data = trajectory_data
+
+    def _check_format(self, trajectory_data: pd.DataFrame):
+        # Check if the trajectory_data has the required columns
+        required_columns = ["x", "y"]
+        for col in required_columns:
+            if col not in trajectory_data.columns:
+                raise ValueError(f"Missing required column: {col}")
+        for col in trajectory_data.columns:
+            if col not in required_columns:
+                raise ValueError(f"Unexpected column: {col}")
+
+        # Check if the trajectory_data has the correct data types
+        # x: numeric, y: numeric
+        if not pd.api.types.is_numeric_dtype(trajectory_data["x"]):
+            raise ValueError("Column 'x' must be numeric.")
+        if not pd.api.types.is_numeric_dtype(trajectory_data["y"]):
+            raise ValueError("Column 'y' must be numeric.")
+
+    def to_speed(self, window_size: int = 5, mode: str = "linear") -> list:
+        """Convert trajectory data to speed data.
+        The speed is calculated within a window of size window_size.
+        The speed is calculated using the following methods:
+            - linear: linear regression of the window data. The speed is the slope of the line.
+            - mean: mean of the speed calculated from the neighboring points.
+            - single: the speed is calculated from the first and last points of the window.
+
+        Args:
+            window_size (int, optional): window size to calculate speed. Defaults to 5.
+            mode (str, optional): mode to calculate speed, can be "linear", "mean", or "single".
+            Defaults to "linear".
+
+        Raises:
+            ValueError: _window_size_ must be at least 2.
+            ValueError: _mode_ must be "linear", "mean", or "single".
+            ValueError: Less data points than window size.
+
+        Returns:
+            list: list of speed values with length n - window_size + 1
+        """
+        # Calculate the speed
+
+        if window_size < 2:
+            raise ValueError("Window size must be at least 2.")
+
+        if mode not in ["linear", "mean", "single"]:
+            raise ValueError("Mode must be 'linear', 'mean', or 'single'.")
+
+        n = len(self.trajectory_data)
+        if n < window_size:
+            raise ValueError("Less data points than window size.")
+
+        speeds = []
+        for i in range(n - window_size + 1):
+            data_window = self.trajectory_data.iloc[i : i + window_size]
+            x = data_window["x"].values
+            y = data_window["y"].values
+            t = np.arange(len(x)) / self.fps
+
+            # If there are NaN values in the data window, skip this window
+            if np.isnan(x).any() or np.isnan(y).any():
+                continue
+
+            if mode == "linear":
+                coeffs = np.polyfit(t, x, 1), np.polyfit(t, y, 1)
+                vx, vy = coeffs[0][0], coeffs[1][0]
+                speed = np.sqrt(vx**2 + vy**2)
+            elif mode == "mean":
+                dx, dy, dt = np.diff(x), np.diff(y), np.diff(t)
+                speed = np.sqrt(dx**2 + dy**2) / dt
+                speed = np.mean(speed)
+            elif mode == "single":
+                dx, dy, dt = x[-1] - x[0], y[-1] - y[0], t[-1] - t[0]
+                speed = np.sqrt(dx**2 + dy**2) / dt
+            speeds.append(speed)
+        return speeds
+
+
+class TrajectoryCollection:
+    """TrajectoryCollection class for loading and further processing."""
+
+    def __init__(self, trajectory_path: str, fps: int, scale: float = 1.0):
+        """Initialize the TrajectoryCollection class.
+
+        Args:
+            trajectory_path (str): path to the trajectory data file.
+            fps (int): frames per second of the video.
+            scale (float, optional): scale factor for the trajectory data.
+            (can be used to convert from pixels to cm).
+        """
+        traj_data = pd.read_csv(trajectory_path, sep=",")
+
+        self.identities = [int(col[1:]) for col in traj_data.columns if "x" in col]
+        self.trajectories = {}
+        for identity in self.identities:
+            tmp_traj = traj_data[[f"x{identity}", f"y{identity}"]].copy()
+            tmp_traj.columns = ["x", "y"]
+            tmp_traj["x"] = tmp_traj["x"] * scale
+            tmp_traj["y"] = tmp_traj["y"] * scale
+            self.trajectories[identity] = Trajectory(tmp_traj, identity, fps)
+        self.fps = fps
+
+    def to_speed(self, window_size: int = 5, mode: str = "linear") -> dict:
+        """Convert trajectory data to speed data for all trajectories.
+        The speed is calculated within a window of size window_size.
+        The speed is calculated using the following methods:
+            - linear: linear regression of the window data. The speed is the slope of the line.
+            - mean: mean of the speed calculated from the neighboring points.
+            - single: the speed is calculated from the first and last points of the window.
+
+        Args:
+            window_size (int, optional): window size to calculate speed. Defaults to 5.
+            mode (str, optional): mode to calculate speed, can be "linear", "mean", or "single".
+            Defaults to "linear".
+
+        Returns:
+            dict: dictionary with identity as key and list of speed values as value
+        """
+        speeds = {}
+        for identity in self.identities:
+            speeds[identity] = self.trajectories[identity].to_speed(window_size, mode)
+        return speeds
