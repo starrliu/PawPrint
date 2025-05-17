@@ -33,7 +33,7 @@ tc = TrajectoryCollection(
     scale=SCALE_FROM_PIXEL_TO_CM,
 )
 # Get the speed distribution of each identity
-speeds = tc.to_speed(window_size=5, mode="linear")
+speeds = tc.to_speed(window_size=5, mode="mean")
 ```
 
 ## Contributing
