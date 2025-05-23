@@ -16,29 +16,32 @@ import numpy as np
 class Trajectory:
     """Trajectory class for loading and further processing."""
 
-    def __init__(self, trajectory_data: pd.DataFrame, identity: int, fps: int):
+    def __init__(self, trajectory_data, identity: int, fps: int):
         self.identity = identity
         self.fps = fps
         # Check the trajectory_data format
         self._check_format(trajectory_data)
         # Store the trajectory data
         self.trajectory_data = trajectory_data
+        self.len = len(trajectory_data["x"])
 
-    def _check_format(self, trajectory_data: pd.DataFrame):
+    def _check_format(self, trajectory_data):
         # Check if the trajectory_data has the required columns
         required_columns = ["x", "y"]
         for col in required_columns:
-            if col not in trajectory_data.columns:
+            if col not in trajectory_data:
                 raise ValueError(f"Missing required column: {col}")
-        for col in trajectory_data.columns:
+        if(len(trajectory_data["x"])!=len(trajectory_data["y"])):
+            raise ValueError(f"x and y have different len")
+        for col in trajectory_data:
             if col not in required_columns:
                 raise ValueError(f"Unexpected column: {col}")
 
         # Check if the trajectory_data has the correct data types
         # x: numeric, y: numeric
-        if not pd.api.types.is_numeric_dtype(trajectory_data["x"]):
+        if not all(isinstance(x,(int,float)) for x in trajectory_data["x"]):
             raise ValueError("Column 'x' must be numeric.")
-        if not pd.api.types.is_numeric_dtype(trajectory_data["y"]):
+        if not all(isinstance(x,(int,float)) for x in trajectory_data["y"]):
             raise ValueError("Column 'y' must be numeric.")
 
     def to_speed(self, window_size: int = 5, mode: str = "linear") -> list:
@@ -70,16 +73,15 @@ class Trajectory:
         if mode not in ["linear", "mean", "single"]:
             raise ValueError("Mode must be 'linear', 'mean', or 'single'.")
 
-        n = len(self.trajectory_data)
+        n = self.len
         if n < window_size:
             raise ValueError("Less data points than window size.")
 
         speeds = []
         for i in range(n - window_size + 1):
-            data_window = self.trajectory_data.iloc[i : i + window_size]
-            x = data_window["x"].values
-            y = data_window["y"].values
-            t = np.arange(len(x)) / self.fps
+            x = self.trajectory_data["x"][i:i+window_size]
+            y = self.trajectory_data["y"][i:i+window_size]
+            t = np.arange(window_size) / self.fps
 
             # If there are NaN values in the data window, skip this window
             if np.isnan(x).any() or np.isnan(y).any():
@@ -117,11 +119,15 @@ class TrajectoryCollection:
         self.identities = [int(col[1:]) for col in traj_data.columns if "x" in col]
         self.trajectories = {}
         for identity in self.identities:
-            tmp_traj = traj_data[[f"x{identity}", f"y{identity}"]].copy()
-            tmp_traj.columns = ["x", "y"]
-            tmp_traj["x"] = tmp_traj["x"] * scale
-            tmp_traj["y"] = tmp_traj["y"] * scale
-            self.trajectories[identity] = Trajectory(tmp_traj, identity, fps)
+            # tmp_traj = traj_data[[f"x{identity}", f"y{identity}"]].copy()
+            # tmp_traj.columns = ["x", "y"]
+            # tmp_traj["x"] = tmp_traj["x"] * scale
+            # tmp_traj["y"] = tmp_traj["y"] * scale
+            tmp = {}
+            tmp["x"]=(traj_data[f"x{identity}"]*scale).tolist()
+            tmp["y"]=(traj_data[f"y{identity}"]*scale).tolist()
+            # print(tmp)
+            self.trajectories[identity] = Trajectory(tmp, identity, fps)
         self.fps = fps
 
     def to_speed(self, window_size: int = 5, mode: str = "linear") -> dict:
