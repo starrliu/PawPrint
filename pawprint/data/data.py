@@ -106,7 +106,7 @@ class Trajectory:
             # If there are NaN values in the data window, skip this window
             if np.isnan(x).any() or np.isnan(y).any():
                 continue
-            
+
             speed = None
             if mode == "linear":
                 speed = self._calculate_linear_speed(x, y, t)
