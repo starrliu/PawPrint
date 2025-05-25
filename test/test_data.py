@@ -1,6 +1,5 @@
 """Test the data module."""
 
-import pandas as pd
 import pytest
 
 from pawprint.data import Trajectory
@@ -22,14 +21,13 @@ class TestTrajectory:
     def test_init(self, trajectory_data):
         """Test the initialization of the Trajectory class."""
         # Create a sample trajectory data
-        traj_df = pd.DataFrame(trajectory_data)
-        Trajectory(traj_df, 1, 30)
+        Trajectory(trajectory_data, 1, 30)
 
     def test_speed(self, trajectory_data):
         """Test the speed calculation."""
-        traj_df = pd.DataFrame(trajectory_data)
-        traj_df["x"][2] = None  # Introduce NaN value
-        traj_df["y"][2] = None
+        traj_df = trajectory_data
+        traj_df["x"][2] = float("nan")
+        traj_df["y"][2] = float("nan")
         traj = Trajectory(traj_df, 1, 30)
 
         speed_gt = 30 * 2**0.5  # 30 fps, 1 second, 2 units of distance
@@ -53,10 +51,3 @@ class TestTrajectory:
             traj.to_speed(3, "invalid_mode")
         with pytest.raises(ValueError):
             traj.to_speed(11, "linear")
-
-
-class TestTrajectoryCollection:
-    """Test the TrajectoryCollection class."""
-
-    def test_init(self):
-        pass

@@ -16,33 +16,53 @@ import numpy as np
 class Trajectory:
     """Trajectory class for loading and further processing."""
 
-    def __init__(self, trajectory_data, identity: int, fps: int):
+    def __init__(self, trajectory_data: dict, identity: int, fps: int):
         self.identity = identity
         self.fps = fps
         # Check the trajectory_data format
         self._check_format(trajectory_data)
         # Store the trajectory data
         self.trajectory_data = trajectory_data
-        self.len = len(trajectory_data["x"])
 
     def _check_format(self, trajectory_data):
+        # Check the type of trajectory_data
+        if not isinstance(trajectory_data, dict):
+            raise TypeError("trajectory_data must be a dictionary.")
+
         # Check if the trajectory_data has the required columns
         required_columns = ["x", "y"]
         for col in required_columns:
             if col not in trajectory_data:
                 raise ValueError(f"Missing required column: {col}")
-        if(len(trajectory_data["x"])!=len(trajectory_data["y"])):
-            raise ValueError(f"x and y have different len")
+        if len(trajectory_data["x"]) != len(trajectory_data["y"]):
+            raise ValueError("x and y have different len")
         for col in trajectory_data:
             if col not in required_columns:
                 raise ValueError(f"Unexpected column: {col}")
 
         # Check if the trajectory_data has the correct data types
         # x: numeric, y: numeric
-        if not all(isinstance(x,(int,float)) for x in trajectory_data["x"]):
+        if not all(isinstance(x, (int, float)) for x in trajectory_data["x"]):
             raise ValueError("Column 'x' must be numeric.")
-        if not all(isinstance(x,(int,float)) for x in trajectory_data["y"]):
+        if not all(isinstance(x, (int, float)) for x in trajectory_data["y"]):
             raise ValueError("Column 'y' must be numeric.")
+
+    def _calculate_linear_speed(self, x: list, y: list, t: list) -> float:
+        """Calculate speed using linear regression."""
+        coeffs = np.polyfit(t, x, 1), np.polyfit(t, y, 1)
+        vx, vy = coeffs[0][0], coeffs[1][0]
+        return np.sqrt(vx**2 + vy**2)
+
+    def _calculate_mean_speed(self, x: list, y: list, t: list) -> float:
+        """Calculate speed using mean of neighboring points."""
+        dx, dy, dt = np.diff(x), np.diff(y), np.diff(t)
+        speed = np.sqrt(dx**2 + dy**2) / dt
+        return np.mean(speed)
+
+    def _calculate_single_speed(self, x: list, y: list, t: list) -> float:
+        """Calculate speed using first and last points."""
+        dx, dy, dt = x[-1] - x[0], y[-1] - y[0], t[-1] - t[0]
+        return np.sqrt(dx**2 + dy**2) / dt
 
     def to_speed(self, window_size: int = 5, mode: str = "linear") -> list:
         """Convert trajectory data to speed data.
@@ -73,33 +93,32 @@ class Trajectory:
         if mode not in ["linear", "mean", "single"]:
             raise ValueError("Mode must be 'linear', 'mean', or 'single'.")
 
-        n = self.len
+        n = len(self)
         if n < window_size:
             raise ValueError("Less data points than window size.")
 
         speeds = []
         for i in range(n - window_size + 1):
-            x = self.trajectory_data["x"][i:i+window_size]
-            y = self.trajectory_data["y"][i:i+window_size]
+            x = self.trajectory_data["x"][i : i + window_size]
+            y = self.trajectory_data["y"][i : i + window_size]
             t = np.arange(window_size) / self.fps
 
             # If there are NaN values in the data window, skip this window
             if np.isnan(x).any() or np.isnan(y).any():
                 continue
-
+            
+            speed = None
             if mode == "linear":
-                coeffs = np.polyfit(t, x, 1), np.polyfit(t, y, 1)
-                vx, vy = coeffs[0][0], coeffs[1][0]
-                speed = np.sqrt(vx**2 + vy**2)
+                speed = self._calculate_linear_speed(x, y, t)
             elif mode == "mean":
-                dx, dy, dt = np.diff(x), np.diff(y), np.diff(t)
-                speed = np.sqrt(dx**2 + dy**2) / dt
-                speed = np.mean(speed)
+                speed = self._calculate_mean_speed(x, y, t)
             elif mode == "single":
-                dx, dy, dt = x[-1] - x[0], y[-1] - y[0], t[-1] - t[0]
-                speed = np.sqrt(dx**2 + dy**2) / dt
+                speed = self._calculate_single_speed(x, y, t)
             speeds.append(speed)
         return speeds
+
+    def __len__(self):
+        return len(self.trajectory_data["x"])
 
 
 class TrajectoryCollection:
@@ -119,14 +138,9 @@ class TrajectoryCollection:
         self.identities = [int(col[1:]) for col in traj_data.columns if "x" in col]
         self.trajectories = {}
         for identity in self.identities:
-            # tmp_traj = traj_data[[f"x{identity}", f"y{identity}"]].copy()
-            # tmp_traj.columns = ["x", "y"]
-            # tmp_traj["x"] = tmp_traj["x"] * scale
-            # tmp_traj["y"] = tmp_traj["y"] * scale
             tmp = {}
-            tmp["x"]=(traj_data[f"x{identity}"]*scale).tolist()
-            tmp["y"]=(traj_data[f"y{identity}"]*scale).tolist()
-            # print(tmp)
+            tmp["x"] = (traj_data[f"x{identity}"] * scale).tolist()
+            tmp["y"] = (traj_data[f"y{identity}"] * scale).tolist()
             self.trajectories[identity] = Trajectory(tmp, identity, fps)
         self.fps = fps
 
