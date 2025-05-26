@@ -164,3 +164,14 @@ class TrajectoryCollection:
         for identity in self.identities:
             speeds[identity] = self.trajectories[identity].to_speed(window_size, mode)
         return speeds
+
+    def to_distance(self, first_identity: int, second_identity: int) -> list:
+        """Calculate distance between two trajectories.
+        Args:
+            first_identity (int): identity of the first trajectory.
+            second_identity (int): identity of the second trajectory.
+        Returns:
+            list: list of distance values with length n
+        """
+        # TODO: implement
+        return
