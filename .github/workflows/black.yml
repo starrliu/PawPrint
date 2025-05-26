@@ -1,0 +1,34 @@
+name: Black Code Formatter
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          
+      - name: Install Black
+        run: pip install black
+        
+      - name: Run Black
+        run: black .
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: 'style: Format Python code with Black'
+          title: 'style: Format Python code with Black'
+          body: |
+            automated pull request by black formatter            
+          branch: black-formatter
+          delete-branch: true
