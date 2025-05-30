@@ -173,5 +173,13 @@ class TrajectoryCollection:
         Returns:
             list: list of distance values with length n
         """
+
+        """
+        需要实现的内容：给定两个ID，计算两个ID对应轨迹每个时刻的距离。
+        返回值是一个列表，长度为n，n为轨迹的长度。
+        特殊情况：
+            1. 某个时刻，有一个位置为nan，那么这个时刻的距离为nan。
+        """
+
         # TODO: implement
         return

@@ -51,3 +51,19 @@ class TestTrajectory:
             traj.to_speed(3, "invalid_mode")
         with pytest.raises(ValueError):
             traj.to_speed(11, "linear")
+
+
+class TestTrajectoryCollection:
+    """Test the TrajectoryCollection class."""
+
+    def test_init(self):
+        # TODO
+        return
+
+    def test_to_distance(self):
+        # TODO
+        return
+
+    def test_to_speed(self):
+        # TODO
+        return
