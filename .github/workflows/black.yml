@@ -31,4 +31,5 @@ jobs:
           body: |
             automated pull request by black formatter            
           branch: black-formatter
+          base: main
           delete-branch: true
