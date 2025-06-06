@@ -35,13 +35,6 @@ class ChasingEvent(Event):
     correlation: float
 
 
-# TODO: 实现ChasingDetector类，如下内容由LLM自动生成，仅为代码框架，建议根据实际需求修改
-# 一些hint:
-# 1. 由于需要对每对小鼠进行遍历，所以这个算法的时间复杂度为O(n^2)，n为小鼠的只数。所以，最好进行一些剪枝。比如，
-#    当对subject进行遍历时，如果subject的移动距离小于min_movement，那么就可以跳过这个subject。
-# 2. 可以先根据视频选出一些追逐的片段，然后对这些片段进行测试。
-# 3. default的参数都可以修改，不一定合适。
-# 4. 这段代码可能比较长，最好保持代码结构清晰。可以多定义一些函数，使得代码更加清晰。
 class ChasingDetector(EventDetection):
     """Chasing event detection class.
     Args:
@@ -84,25 +77,66 @@ class ChasingDetector(EventDetection):
         x2, y2 = pos2
         return np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-    def _calculate_movement(self, positions: list) -> float:
+    def _calculate_movement(self, positions: list) -> list:
         """Calculate the movement of a trajectory."""
-        total_distance = 0
+        movement = []
         for i in range(len(positions) - 1):
-            total_distance += self._calculate_distance(positions[i], positions[i + 1])
-        return total_distance
+            movement.append(self._calculate_distance(positions[i], positions[i + 1]))
+        return movement
 
-    def _calculate_correlation(self, traj1: list, traj2: list) -> float:
-        """Calculate the correlation between two trajectories."""
-        # 计算位移向量
+    def _init_correlation(self, traj1: list, traj2: list) -> tuple:
+
         dx1 = np.diff([x for x, _ in traj1])
         dy1 = np.diff([y for _, y in traj1])
         dx2 = np.diff([x for x, _ in traj2])
         dy2 = np.diff([y for _, y in traj2])
 
-        # 计算方向向量的相关性
-        corr_x = np.corrcoef(dx1, dx2)[0, 1]
-        corr_y, _ = np.corrcoef(dy1, dy2)
-        return (corr_x + corr_y) / 2
+        tmpx = [dx1 * dx1, dx1 * dx2, dx2 * dx2, dx1, dx2]
+        tmpy = [dy1 * dy1, dy1 * dy2, dy2 * dy2, dy1, dy2]
+
+        return (tmpx, tmpy)
+
+    def _calculate_correlation(self, tmp: list, l: int, r: int, n: int) -> float:
+        """Calculate the correlation between two lists."""
+
+        x11 = np.sum(tmp[0][l:r])
+        x12 = np.sum(tmp[1][l:r])
+        x22 = np.sum(tmp[2][l:r])
+        x1 = np.sum(tmp[3][l:r])
+        x2 = np.sum(tmp[4][l:r])
+
+        x1 /= n
+        x2 /= n
+
+        cov = np.asarray(
+            [
+                [x11 - n * x1 * x1, x12 - n * x1 * x2],
+                [x12 - n * x1 - x2, x22 - n * x2 * x2],
+            ]
+        )
+        cov /= n - 1
+
+        std1 = np.sqrt(cov[0, 0])
+        std2 = np.sqrt(cov[1, 1])
+        corr = cov / np.outer([std1, std2], [std1, std2])
+
+        return corr[0, 1]
+
+    def _test_correlation(
+        self,
+        tmp: list,
+        l: int,
+        r: int,
+        correlation: float,
+    ) -> int:
+        ground = np.corrcoef(tmp[3][l:r], tmp[4][l:r])[0, 1]
+        if np.isnan(ground):
+            return np.isnan(correlation)
+
+        if np.isnan(correlation):
+            return 0
+
+        return abs(correlation - ground) < 1e-5
 
     def detect(self) -> list[ChasingEvent]:
         """检测追逐行为。
@@ -115,35 +149,93 @@ class ChasingDetector(EventDetection):
         # 遍历所有可能的追逐者-被追逐者对
         for chaser_id in self.trajectory_collection.identities:
             for chasee_id in self.trajectory_collection.identities:
-                if chaser_id == chasee_id:
+                print(chaser_id, chasee_id)
+                if chaser_id >= chasee_id:
                     continue
 
                 chaser = self.trajectory_collection.trajectories[chaser_id]
                 chasee = self.trajectory_collection.trajectories[chasee_id]
 
+                chaser_positions = list(
+                    zip(
+                        chaser.trajectory_data["x"],
+                        chaser.trajectory_data["y"],
+                    )
+                )
+                chasee_positions = list(
+                    zip(
+                        chasee.trajectory_data["x"],
+                        chasee.trajectory_data["y"],
+                    )
+                )
+
+                distances = self.trajectory_collection.to_distance(chaser_id, chasee_id)
+
+                chaser_movement = self._calculate_movement(chaser_positions)
+                chasee_movement = self._calculate_movement(chasee_positions)
+
+                # 预处理计算 correlation 所需的量
+                (tmp_x, tmp_y) = self._init_correlation(
+                    chaser_positions, chasee_positions
+                )
+
                 # 在滑动窗口中检测追逐行为
                 for start_frame in range(len(chaser) - self.window_size):
                     end_frame = start_frame + self.window_size
 
-                    # 提取窗口内的轨迹
-                    chaser_positions = list(
-                        zip(
-                            chaser.trajectory_data["x"][start_frame:end_frame],
-                            chaser.trajectory_data["y"][start_frame:end_frame],
-                        )
+                    # 计算窗口内的所需值
+                    chaser_movement_val = sum(
+                        chaser_movement[start_frame : end_frame - 1]
                     )
-                    chasee_positions = list(
-                        zip(
-                            chasee.trajectory_data["x"][start_frame:end_frame],
-                            chasee.trajectory_data["y"][start_frame:end_frame],
-                        )
+                    chasee_movement_val = sum(
+                        chasee_movement[start_frame : end_frame - 1]
                     )
 
-                    # TODO: 实现追逐行为的判定逻辑
-                    # 1. 计算移动距离
-                    # 2. 计算平均距离
-                    # 3. 计算轨迹相关性
-                    # 4. 根据阈值判断是否为追逐行为
-                    # 5. 如果满足条件，创建并添加ChasingEvent
+                    final_distance = distances[end_frame - 1]
+
+                    correlation_x = self._calculate_correlation(
+                        tmp_x, start_frame, end_frame - 1, self.window_size - 1
+                    )
+                    correlation_y = self._calculate_correlation(
+                        tmp_y, start_frame, end_frame - 1, self.window_size - 1
+                    )
+
+                    # 检测优化的 correlation 是否正确
+                    # if not self._test_correlation(
+                    #     tmp_x, start_frame, end_frame - 1, correlation_x
+                    # ):
+                    #     raise ValueError(f"correlation_x wrong {start_frame,end_frame}")
+                    # if not self._test_correlation(
+                    #     tmp_y, start_frame, end_frame - 1, correlation_y
+                    # ):
+                    #     raise ValueError(f"correlation_y wrong {start_frame,end_frame}")
+
+                    correlation = (correlation_x + correlation_y) / 2
+                    if (
+                        final_distance > self.min_distance
+                        and chaser_movement_val > self.min_movement
+                        and chasee_movement_val > self.min_movement
+                        and abs(correlation) > self.min_correlation
+                    ):
+                        if correlation < 0:
+                            correlation = -correlation
+                            chaser_id, chasee_id = chasee_id, chaser_id
+                            chaser_movement_val, chasee_movement_val = (
+                                chasee_movement_val,
+                                chaser_movement_val,
+                            )
+                        chasingevent = ChasingEvent(
+                            start_frame=start_frame,
+                            end_frame=end_frame,
+                            subject_identity=chaser_id,
+                            object_identity=chasee_id,
+                            subject_moving_distance=chaser_movement_val,
+                            object_moving_distance=chasee_movement_val,
+                            final_distance=final_distance,
+                            correlation=correlation,
+                        )
+                        events.append(chasingevent)
+                        if chaser_id >= chasee_id:
+                            chaser_id, chasee_id = chasee_id, chaser_id
 
         return events
