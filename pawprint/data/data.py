@@ -51,18 +51,18 @@ class Trajectory:
         """Calculate speed using linear regression."""
         coeffs = np.polyfit(t, x, 1), np.polyfit(t, y, 1)
         vx, vy = coeffs[0][0], coeffs[1][0]
-        return np.sqrt(vx**2 + vy**2)
+        return np.sqrt(vx ** 2 + vy ** 2)
 
     def _calculate_mean_speed(self, x: list, y: list, t: list) -> float:
         """Calculate speed using mean of neighboring points."""
         dx, dy, dt = np.diff(x), np.diff(y), np.diff(t)
-        speed = np.sqrt(dx**2 + dy**2) / dt
+        speed = np.sqrt(dx ** 2 + dy ** 2) / dt
         return np.mean(speed)
 
     def _calculate_single_speed(self, x: list, y: list, t: list) -> float:
         """Calculate speed using first and last points."""
         dx, dy, dt = x[-1] - x[0], y[-1] - y[0], t[-1] - t[0]
-        return np.sqrt(dx**2 + dy**2) / dt
+        return np.sqrt(dx ** 2 + dy ** 2) / dt
 
     def to_speed(self, window_size: int = 5, mode: str = "linear") -> list:
         """Convert trajectory data to speed data.
@@ -120,6 +120,16 @@ class Trajectory:
     def __len__(self):
         return len(self.trajectory_data["x"])
 
+    @property
+    def x(self):
+        """Get the x-coordinates of the trajectory points as a NumPy array."""
+        return np.asarray(self.trajectory_data["x"])
+
+    @property
+    def y(self):
+        """Get the y-coordinates of the trajectory points as a NumPy array."""
+        return np.asarray(self.trajectory_data["y"])
+
 
 class TrajectoryCollection:
     """TrajectoryCollection class for loading and further processing."""
@@ -174,12 +184,20 @@ class TrajectoryCollection:
             list: list of distance values with length n
         """
 
-        """
-        需要实现的内容：给定两个ID，计算两个ID对应轨迹每个时刻的距离。
-        返回值是一个列表，长度为n，n为轨迹的长度。
-        特殊情况：
-            1. 某个时刻，有一个位置为nan，那么这个时刻的距离为nan。
-        """
+        if first_identity not in self.identities:
+            raise IndexError("Unexpected first_identity")
+        if second_identity not in self.identities:
+            raise IndexError("Unexpected second_identity")
+        data1 = self.trajectories[first_identity]
+        data2 = self.trajectories[second_identity]
 
-        # TODO: implement
-        return
+        if len(data1) != len(data2):
+            raise ValueError(
+                f"Data {first_identity} and {second_identity} have different number of points"
+            )
+
+        x = data1.x - data2.x
+        y = data1.y - data2.y
+        distances = np.sqrt(x ** 2 + y ** 2)
+
+        return distances
