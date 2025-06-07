@@ -54,6 +54,8 @@ class ChasingDetector(EventDetection):
         min_distance: float = 30.0,
         min_correlation: float = 0.7,
         min_movement: float = 60.0,
+        theta_high: float = 0.5,
+        theta_low: float = 0.2,
         window_size: int = 120,
     ):
         """Initialize the ChasingDetector class.
@@ -63,9 +65,13 @@ class ChasingDetector(EventDetection):
             min_distance (float, optional): minimum distance threshold. Defaults to 30.0 cm
             min_correlation (float, optional): minimum correlation threshold. Defaults to 0.7
             min_movement (float, optional): minimum movement threshold. Defaults to 60.0 cm
+            theta_high (float): chaser threhold. Defaults to 0.5
+            theta_low (float): chasee threhold. Defaults to 0.2
             window_size (int, optional): window size. Defaults to 120
         """
         super().__init__(trajectory_collection)
+        self.theta_high = theta_high
+        self.theta_low = theta_low
         self.min_distance = min_distance
         self.min_correlation = min_correlation
         self.min_movement = min_movement
@@ -84,59 +90,28 @@ class ChasingDetector(EventDetection):
             movement.append(self._calculate_distance(positions[i], positions[i + 1]))
         return movement
 
-    def _init_correlation(self, traj1: list, traj2: list) -> tuple:
+    def _calculate_correlation(self, delta_a: list, delta_b: list) -> float:
+        delta_ax = [x for (x, _) in delta_a]
+        delta_ay = [y for (_, y) in delta_a]
+        delta_bx = [x for (x, _) in delta_b]
+        delta_by = [y for (_, y) in delta_b]
+        corr_x = np.corrcoef(delta_ax, delta_bx)[0, 1]
+        corr_y = np.corrcoef(delta_ay, delta_by)[0, 1]
+        return (corr_x + corr_y) / 2
 
-        dx1 = np.diff([x for x, _ in traj1])
-        dy1 = np.diff([y for _, y in traj1])
-        dx2 = np.diff([x for x, _ in traj2])
-        dy2 = np.diff([y for _, y in traj2])
+    def _calculate_diff(self, traj: list) -> list:
+        dtraj = traj[1:] - traj[:-1]
+        return np.asarray(dtraj)
 
-        tmpx = [dx1 * dx1, dx1 * dx2, dx2 * dx2, dx1, dx2]
-        tmpy = [dy1 * dy1, dy1 * dy2, dy2 * dy2, dy1, dy2]
+    def _calculate_theta(self, delta_a: list, delta_ab: list) -> list:
+        delta_ax = delta_a[:, 0]
+        delta_ay = delta_a[:, 1]
+        delta_abx = delta_ab[:, 0]
+        delta_aby = delta_ab[:, 1]
 
-        return (tmpx, tmpy)
-
-    def _calculate_correlation(self, tmp: list, l: int, r: int, n: int) -> float:
-        """Calculate the correlation between two lists."""
-
-        x11 = np.sum(tmp[0][l:r])
-        x12 = np.sum(tmp[1][l:r])
-        x22 = np.sum(tmp[2][l:r])
-        x1 = np.sum(tmp[3][l:r])
-        x2 = np.sum(tmp[4][l:r])
-
-        x1 /= n
-        x2 /= n
-
-        cov = np.asarray(
-            [
-                [x11 - n * x1 * x1, x12 - n * x1 * x2],
-                [x12 - n * x1 - x2, x22 - n * x2 * x2],
-            ]
+        return (delta_ax * delta_abx + delta_ay * delta_aby) / (
+            np.sqrt((delta_ax ** 2 + delta_ay ** 2) * (delta_abx ** 2 + delta_aby ** 2))
         )
-        cov /= n - 1
-
-        std1 = np.sqrt(cov[0, 0])
-        std2 = np.sqrt(cov[1, 1])
-        corr = cov / np.outer([std1, std2], [std1, std2])
-
-        return corr[0, 1]
-
-    def _test_correlation(
-        self,
-        tmp: list,
-        l: int,
-        r: int,
-        correlation: float,
-    ) -> int:
-        ground = np.corrcoef(tmp[3][l:r], tmp[4][l:r])[0, 1]
-        if np.isnan(ground):
-            return np.isnan(correlation)
-
-        if np.isnan(correlation):
-            return 0
-
-        return abs(correlation - ground) < 1e-5
 
     def detect(self) -> list[ChasingEvent]:
         """检测追逐行为。
@@ -147,95 +122,87 @@ class ChasingDetector(EventDetection):
         events = []
 
         # 遍历所有可能的追逐者-被追逐者对
-        for chaser_id in self.trajectory_collection.identities:
-            for chasee_id in self.trajectory_collection.identities:
-                print(chaser_id, chasee_id)
-                if chaser_id >= chasee_id:
+        for a in self.trajectory_collection.identities:
+            for b in self.trajectory_collection.identities:
+                if a >= b:
                     continue
+                print(a, b)
 
-                chaser = self.trajectory_collection.trajectories[chaser_id]
-                chasee = self.trajectory_collection.trajectories[chasee_id]
-
-                chaser_positions = list(
-                    zip(
-                        chaser.trajectory_data["x"],
-                        chaser.trajectory_data["y"],
-                    )
+                traj_a = self.trajectory_collection.trajectories[a]
+                traj_a = np.asarray(
+                    list(zip(traj_a.trajectory_data["x"], traj_a.trajectory_data["y"]))
                 )
-                chasee_positions = list(
-                    zip(
-                        chasee.trajectory_data["x"],
-                        chasee.trajectory_data["y"],
-                    )
+                traj_b = self.trajectory_collection.trajectories[b]
+                traj_b = np.asarray(
+                    list(zip(traj_b.trajectory_data["x"], traj_b.trajectory_data["y"]))
                 )
 
-                distances = self.trajectory_collection.to_distance(chaser_id, chasee_id)
+                delta_a = self._calculate_diff(traj_a)
+                delta_b = self._calculate_diff(traj_b)
+                delta_ab = traj_a - traj_b
+                delta_ab = delta_ab[:-1]
 
-                chaser_movement = self._calculate_movement(chaser_positions)
-                chasee_movement = self._calculate_movement(chasee_positions)
+                theta_ab = self._calculate_theta(delta_a, delta_ab)
+                theta_ba = self._calculate_theta(delta_b, -delta_ab)
 
-                # 预处理计算 correlation 所需的量
-                (tmp_x, tmp_y) = self._init_correlation(
-                    chaser_positions, chasee_positions
-                )
+                distances = self.trajectory_collection.to_distance(a, b)
+
+                movement_a = self._calculate_movement(traj_a)
+                movement_b = self._calculate_movement(traj_b)
 
                 # 在滑动窗口中检测追逐行为
-                for start_frame in range(len(chaser) - self.window_size):
+                for start_frame in range(len(delta_a) - self.window_size):
                     end_frame = start_frame + self.window_size
 
-                    # 计算窗口内的所需值
-                    chaser_movement_val = sum(
-                        chaser_movement[start_frame : end_frame - 1]
-                    )
-                    chasee_movement_val = sum(
-                        chasee_movement[start_frame : end_frame - 1]
-                    )
+                    movement_a_val = sum(movement_a[start_frame : end_frame - 1])
+
+                    if not movement_a_val > self.min_movement:
+                        continue
+
+                    movement_b_val = sum(movement_b[start_frame : end_frame - 1])
+
+                    if not movement_b_val > self.min_movement:
+                        continue
 
                     final_distance = distances[end_frame - 1]
 
-                    correlation_x = self._calculate_correlation(
-                        tmp_x, start_frame, end_frame - 1, self.window_size - 1
-                    )
-                    correlation_y = self._calculate_correlation(
-                        tmp_y, start_frame, end_frame - 1, self.window_size - 1
-                    )
+                    if not final_distance > self.min_distance:
+                        continue
 
-                    # 检测优化的 correlation 是否正确
-                    # if not self._test_correlation(
-                    #     tmp_x, start_frame, end_frame - 1, correlation_x
-                    # ):
-                    #     raise ValueError(f"correlation_x wrong {start_frame,end_frame}")
-                    # if not self._test_correlation(
-                    #     tmp_y, start_frame, end_frame - 1, correlation_y
-                    # ):
-                    #     raise ValueError(f"correlation_y wrong {start_frame,end_frame}")
-
-                    correlation = (correlation_x + correlation_y) / 2
-                    if (
-                        final_distance > self.min_distance
-                        and chaser_movement_val > self.min_movement
-                        and chasee_movement_val > self.min_movement
-                        and abs(correlation) > self.min_correlation
+                    theta_ab_val = (
+                        np.sum(theta_ab[start_frame:end_frame]) / self.window_size
+                    )
+                    theta_ba_val = (
+                        np.sum(theta_ba[start_frame:end_frame]) / self.window_size
+                    )
+                    if not (
+                        max(theta_ab_val, theta_ba_val) > self.theta_high
+                        and min(theta_ab_val, theta_ba_val) < self.theta_low
                     ):
-                        if correlation < 0:
-                            correlation = -correlation
-                            chaser_id, chasee_id = chasee_id, chaser_id
-                            chaser_movement_val, chasee_movement_val = (
-                                chasee_movement_val,
-                                chaser_movement_val,
-                            )
-                        chasingevent = ChasingEvent(
-                            start_frame=start_frame,
-                            end_frame=end_frame,
-                            subject_identity=chaser_id,
-                            object_identity=chasee_id,
-                            subject_moving_distance=chaser_movement_val,
-                            object_moving_distance=chasee_movement_val,
-                            final_distance=final_distance,
-                            correlation=correlation,
-                        )
-                        events.append(chasingevent)
-                        if chaser_id >= chasee_id:
-                            chaser_id, chasee_id = chasee_id, chaser_id
+                        continue
 
+                    correlation = self._calculate_correlation(
+                        delta_a[start_frame : end_frame - 1],
+                        delta_b[start_frame : end_frame - 1],
+                    )
+                    if not correlation > self.min_correlation:
+                        continue
+
+                    chasingevent = ChasingEvent(
+                        start_frame=start_frame,
+                        end_frame=end_frame,
+                        subject_identity=a,
+                        object_identity=b,
+                        subject_moving_distance=movement_a_val,
+                        object_moving_distance=movement_b_val,
+                        final_distance=final_distance,
+                        correlation=correlation,
+                    )
+                    if theta_ba_val > theta_ab_val:
+                        chasingevent.subject_identity = b
+                        chasingevent.object_identity = a
+                        chasingevent.subject_moving_distance = movement_b_val
+                        chasingevent.object_moving_distance = movement_a_val
+                    events.append(chasingevent)
+        print(len(events))
         return events
