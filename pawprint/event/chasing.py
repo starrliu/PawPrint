@@ -110,7 +110,10 @@ class ChasingDetector(EventDetection):
         delta_aby = delta_ab[:, 1]
 
         return (delta_ax * delta_abx + delta_ay * delta_aby) / (
-            np.sqrt((delta_ax ** 2 + delta_ay ** 2) * (delta_abx ** 2 + delta_aby ** 2))
+            np.sqrt(
+                (delta_ax ** 2 + delta_ay ** 2) * (delta_abx ** 2 + delta_aby ** 2)
+                + 1e-10
+            )
         )
 
     def detect(self) -> list[ChasingEvent]:
@@ -166,14 +169,14 @@ class ChasingDetector(EventDetection):
 
                     final_distance = distances[end_frame - 1]
 
-                    if not final_distance > self.min_distance:
+                    if not final_distance < self.min_distance:
                         continue
 
-                    theta_ab_val = (
-                        np.sum(theta_ab[start_frame:end_frame]) / self.window_size
+                    theta_ab_val = np.sum(theta_ab[start_frame : end_frame - 1]) / (
+                        self.window_size - 1
                     )
-                    theta_ba_val = (
-                        np.sum(theta_ba[start_frame:end_frame]) / self.window_size
+                    theta_ba_val = np.sum(theta_ba[start_frame : end_frame - 1]) / (
+                        self.window_size - 1
                     )
                     if not (
                         max(theta_ab_val, theta_ba_val) > self.theta_high
