@@ -38,6 +38,26 @@ speeds = tc.to_speed(window_size=5, mode="mean")
 
 ## Example
 
+### Data Format and Definitions
+
+PawPrint analyzes animal trajectory data with the following key metrics:
+
+#### **Key Metrics**
+
+**Speed** (`to_speed`):
+- The moving speed of each mouse in cm/s.
+
+**Distance** (`to_distance`):
+- The Euclidean distance between two mice at each frame.
+
+**Proximity** (`to_proximity`):
+- Binary indicator of whether two mice are within a distance threshold (default: 5 cm).
+
+**Approach Events** (`ApproachDetector`):
+- Event where one mouse approaches another mouse from a distance.
+
+### Analysis Scripts
+
 PawPrint provides several analysis scripts in the `script/` folder for different types of social behavior analysis:
 
 ### Speed Analysis (`plot_speed.py`)
