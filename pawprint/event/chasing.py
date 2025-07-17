@@ -8,11 +8,9 @@ import numpy as np
 from .base import Event, EventDetection
 from ..data import TrajectoryCollection
 
-from tqdm import tqdm
-
 @dataclass
 class ChasingEvent(Event):
-    """Chasing event class.
+    """Chasing event class. [Not tested & Poor performance]
 
     Args:
         Event: event base class
@@ -218,8 +216,8 @@ class ChasingDetector(EventDetection):
             trajectories[identity] = self._get_trajectory_data(identity)
 
         # Check all possible pairs
-        for i, identity_a in tqdm(enumerate(identities)):
-            for j, identity_b in tqdm(enumerate(identities)):
+        for i, identity_a in enumerate(identities):
+            for j, identity_b in enumerate(identities):
                 if i >= j:  # Avoid duplicate pairs and self-pairs
                     continue
                  
