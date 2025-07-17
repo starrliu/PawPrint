@@ -47,7 +47,7 @@ Analyzes and visualizes the speed distribution of each mouse using box plots. Th
 python script/plot_speed.py
 ```
 
-![Speed Distribution](imgs/speed_boxplots.png)
+<img src="imgs/speed_boxplots.png" alt="Speed Distribution" width="400">
 
 ### Distance Matrix Analysis (`plot_distance.py`)
 Creates a heatmap visualization of median distances between all mouse pairs, helping identify spatial relationships and grouping patterns.
@@ -56,7 +56,7 @@ Creates a heatmap visualization of median distances between all mouse pairs, hel
 python script/plot_distance.py
 ```
 
-![Distance Matrix](imgs/distance_matrix.png)
+<img src="imgs/distance_matrix.png" alt="Distance Matrix" width="400">
 
 ### Proximity Time Analysis (`plot_proximity.py`)
 Analyzes the total time each mouse pair spends in close proximity (within a specified distance threshold), providing insights into social bonding and interaction patterns.
@@ -65,8 +65,8 @@ Analyzes the total time each mouse pair spends in close proximity (within a spec
 python script/plot_proximity.py
 ```
 
-![Proximity Time Matrix](imgs/proximity_time_matrix.png)
-![Proximity Percentage](imgs/proximity_percentage.png)
+<img src="imgs/proximity_time_matrix.png" alt="Proximity Time Matrix" width="400">
+<img src="imgs/proximity_percentage.png" alt="Proximity Percentage" width="400">
 
 ### Approach Event Detection (`plot_approach.py`)
 Detects and analyzes approach events between mouse pairs, including event counts, durations, and interaction patterns. This provides detailed information about social approach behaviors.
@@ -75,8 +75,8 @@ Detects and analyzes approach events between mouse pairs, including event counts
 python script/plot_approach.py
 ```
 
-![Approach Matrix](imgs/approach_matrix.png)
-![Object Approach Counts](imgs/object_approach_counts.png)
+<img src="imgs/approach_matrix.png" alt="Approach Matrix" width="400">
+<img src="imgs/object_approach_counts.png" alt="Object Approach Counts" width="400">
 
 ## Contributing
 We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) for more information on how to contribute to this project.
