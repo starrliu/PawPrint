@@ -38,11 +38,9 @@ speeds = tc.to_speed(window_size=5, mode="mean")
 
 ## Example
 
-### Data Format and Definitions
+### Key Metrics
 
-PawPrint analyzes animal trajectory data with the following key metrics:
-
-#### **Key Metrics**
+We provide several key metrics for analyzing animal trajectory data:
 
 **Speed** (`to_speed`):
 - The moving speed of each mouse in cm/s.
