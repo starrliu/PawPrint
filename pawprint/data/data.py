@@ -144,6 +144,9 @@ class TrajectoryCollection:
             self.trajectories[identity] = Trajectory(tmp, identity, fps)
         self.fps = fps
 
+    def __len__(self):
+        return len(self.trajectories)
+
     def to_speed(self, window_size: int = 5, mode: str = "linear") -> dict:
         """Convert trajectory data to speed data for all trajectories.
         The speed is calculated within a window of size window_size.
@@ -172,14 +175,59 @@ class TrajectoryCollection:
             second_identity (int): identity of the second trajectory.
         Returns:
             list: list of distance values with length n
-        """
 
+        Raises:
+            ValueError: If either identity is not found in trajectories
         """
-        需要实现的内容：给定两个ID，计算两个ID对应轨迹每个时刻的距离。
-        返回值是一个列表，长度为n，n为轨迹的长度。
-        特殊情况：
-            1. 某个时刻，有一个位置为nan，那么这个时刻的距离为nan。
-        """
+        # Check if identities exist
+        if first_identity not in self.identities:
+            raise ValueError(f"Identity {first_identity} not found in trajectories")
+        if second_identity not in self.identities:
+            raise ValueError(f"Identity {second_identity} not found in trajectories")
+        
+        # Get trajectories
+        traj_first = self.trajectories[first_identity]
+        traj_second = self.trajectories[second_identity]
+        
+        # Ensure all trajectories have the same length
+        len_first = len(traj_first)
+        len_second = len(traj_second)
+        if len_first != len_second:
+            raise ValueError("Trajectories have different lengths")
 
-        # TODO: implement
-        return
+        # Get x, y coordinates as numpy arrays
+        x1 = np.array(traj_first.trajectory_data["x"])
+        y1 = np.array(traj_first.trajectory_data["y"])
+        x2 = np.array(traj_second.trajectory_data["x"])
+        y2 = np.array(traj_second.trajectory_data["y"])
+        
+        # Create mask for NaN values
+        valid_mask = ~(np.isnan(x1) | np.isnan(y1) | np.isnan(x2) | np.isnan(y2))
+        
+        # Initialize distances array with NaN
+        distances = np.full(len_first, np.nan)
+        
+        # Calculate distances only for valid points
+        dx = x1[valid_mask] - x2[valid_mask]
+        dy = y1[valid_mask] - y2[valid_mask]
+        distances[valid_mask] = np.sqrt(dx * dx + dy * dy)
+        
+        return distances.tolist()
+
+    def to_approach(self, first_identity: int, second_identity: int, threshold: float = 5) -> list:
+        """Calculate approach between two trajectories.
+        Args:
+            first_identity (int): identity of the first trajectory.
+            second_identity (int): identity of the second trajectory.
+            threshold (float, optional): threshold for approach. Defaults to 5 cm.
+        Returns:
+            list: indicates whether the distance is less than threshold at each frame.
+                If the distance is NaN, the value is -1.
+                If the distance is less than threshold, the value is 1. 
+                If the distance is greater than threshold, the value is 0.
+        """
+        if threshold <= 0:
+            raise ValueError("Threshold must be positive")
+            
+        distances = self.to_distance(first_identity, second_identity)
+        return [1 if d < threshold else (-1 if np.isnan(d) else 0) for d in distances]
