@@ -60,7 +60,7 @@ PawPrint analyzes animal trajectory data with the following key metrics:
 
 PawPrint provides several analysis scripts in the `script/` folder for different types of social behavior analysis:
 
-### Speed Analysis (`plot_speed.py`)
+#### Speed Analysis (`plot_speed.py`)
 Analyzes and visualizes the speed distribution of each mouse using box plots. This script helps understand individual movement patterns and activity levels.
 
 ```bash
@@ -69,7 +69,7 @@ python script/plot_speed.py
 
 <img src="imgs/speed_boxplots.png" alt="Speed Distribution" width="400">
 
-### Distance Matrix Analysis (`plot_distance.py`)
+#### Distance Matrix Analysis (`plot_distance.py`)
 Creates a heatmap visualization of median distances between all mouse pairs, helping identify spatial relationships and grouping patterns.
 
 ```bash
@@ -78,7 +78,7 @@ python script/plot_distance.py
 
 <img src="imgs/distance_matrix.png" alt="Distance Matrix" width="400">
 
-### Proximity Time Analysis (`plot_proximity.py`)
+#### Proximity Time Analysis (`plot_proximity.py`)
 Analyzes the total time each mouse pair spends in close proximity (within a specified distance threshold), providing insights into social bonding and interaction patterns.
 
 ```bash
@@ -88,7 +88,7 @@ python script/plot_proximity.py
 <img src="imgs/proximity_time_matrix.png" alt="Proximity Time Matrix" width="400">
 <img src="imgs/proximity_percentage.png" alt="Proximity Percentage" width="400">
 
-### Approach Event Detection (`plot_approach.py`)
+#### Approach Event Detection (`plot_approach.py`)
 Detects and analyzes approach events between mouse pairs, including event counts, durations, and interaction patterns. This provides detailed information about social approach behaviors.
 
 ```bash
