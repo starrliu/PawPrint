@@ -36,5 +36,65 @@ tc = TrajectoryCollection(
 speeds = tc.to_speed(window_size=5, mode="mean")
 ```
 
+## Example
+
+### Key Metrics
+
+We provide several key metrics for analyzing animal trajectory data:
+
+**Speed** (`to_speed`):
+- The moving speed of each mouse in cm/s.
+
+**Distance** (`to_distance`):
+- The Euclidean distance between two mice at each frame.
+
+**Proximity** (`to_proximity`):
+- Binary indicator of whether two mice are within a distance threshold (default: 5 cm).
+
+**Approach Events** (`ApproachDetector`):
+- Event where one mouse approaches another mouse from a distance.
+
+### Analysis Scripts
+
+PawPrint provides several analysis scripts in the `script/` folder for different types of social behavior analysis:
+
+#### Speed Analysis (`plot_speed.py`)
+Analyzes and visualizes the speed distribution of each mouse using box plots. This script helps understand individual movement patterns and activity levels.
+
+```bash
+python script/plot_speed.py
+```
+
+<img src="imgs/speed_boxplots.png" alt="Speed Distribution" width="400">
+
+#### Distance Matrix Analysis (`plot_distance.py`)
+Creates a heatmap visualization of median distances between all mouse pairs, helping identify spatial relationships and grouping patterns.
+
+```bash
+python script/plot_distance.py
+```
+
+<img src="imgs/distance_matrix.png" alt="Distance Matrix" width="400">
+
+#### Proximity Time Analysis (`plot_proximity.py`)
+Analyzes the total time each mouse pair spends in close proximity (within a specified distance threshold), providing insights into social bonding and interaction patterns.
+
+```bash
+python script/plot_proximity.py
+```
+
+<img src="imgs/proximity_time_matrix.png" alt="Proximity Time Matrix" width="400">
+<img src="imgs/proximity_percentage.png" alt="Proximity Percentage" width="400">
+
+#### Approach Event Detection (`plot_approach.py`)
+Detects and analyzes approach events between mouse pairs, including event counts, durations, and interaction patterns. This provides detailed information about social approach behaviors.
+
+```bash
+python script/plot_approach.py
+```
+
+<img src="imgs/approach_matrix.png" alt="Approach Matrix" width="400">
+<img src="imgs/object_approach_counts.png" alt="Object Approach Counts" width="400">
+
 ## Contributing
 We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) for more information on how to contribute to this project.
