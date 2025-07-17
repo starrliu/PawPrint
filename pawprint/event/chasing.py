@@ -8,6 +8,7 @@ import numpy as np
 from .base import Event, EventDetection
 from ..data import TrajectoryCollection
 
+
 @dataclass
 class ChasingEvent(Event):
     """Chasing event class. [Not tested & Poor performance]
@@ -55,7 +56,7 @@ class ChasingEvent(Event):
 
 class ChasingDetector(EventDetection):
     """Chasing event detection class.
-    
+
     Args:
         EventDetection: event detection base class
 
@@ -98,13 +99,15 @@ class ChasingDetector(EventDetection):
         self.correlation_threshold = correlation_threshold
         self.window_size = window_size
 
-    def _calculate_distance(self, pos1: Tuple[float, float], pos2: Tuple[float, float]) -> float:
+    def _calculate_distance(
+        self, pos1: Tuple[float, float], pos2: Tuple[float, float]
+    ) -> float:
         """Calculate Euclidean distance between two positions.
-        
+
         Args:
             pos1: Position 1 (x, y)
             pos2: Position 2 (x, y)
-            
+
         Returns:
             float: Euclidean distance
         """
@@ -112,10 +115,10 @@ class ChasingDetector(EventDetection):
 
     def _calculate_velocity(self, trajectory: np.ndarray) -> np.ndarray:
         """Calculate velocity vectors from trajectory.
-        
+
         Args:
             trajectory: Trajectory array of shape (n_frames, 2)
-            
+
         Returns:
             np.ndarray: Velocity vectors of shape (n_frames-1, 2)
         """
@@ -123,47 +126,49 @@ class ChasingDetector(EventDetection):
 
     def _calculate_speed(self, velocity: np.ndarray) -> np.ndarray:
         """Calculate speed from velocity vectors.
-        
+
         Args:
             velocity: Velocity vectors of shape (n_frames, 2)
-            
+
         Returns:
             np.ndarray: Speed values of shape (n_frames,)
         """
-        return np.sqrt(np.sum(velocity ** 2, axis=1))
+        return np.sqrt(np.sum(velocity**2, axis=1))
 
-    def _calculate_cos_theta(self, velocity_a: np.ndarray, position_diff: np.ndarray) -> np.ndarray:
+    def _calculate_cos_theta(
+        self, velocity_a: np.ndarray, position_diff: np.ndarray
+    ) -> np.ndarray:
         """Calculate cosine of angle between velocity and position difference.
-        
+
         Args:
             velocity_a: Velocity vectors of mouse A
             position_diff: Position difference vectors (A - B)
-            
+
         Returns:
             np.ndarray: Cosine values
         """
         # Normalize vectors
         velocity_norm = np.linalg.norm(velocity_a, axis=1)
         position_norm = np.linalg.norm(position_diff, axis=1)
-        
+
         # Avoid division by zero
         velocity_norm = np.where(velocity_norm == 0, 1e-10, velocity_norm)
         position_norm = np.where(position_norm == 0, 1e-10, position_norm)
-        
+
         # Calculate dot product
         dot_product = np.sum(velocity_a * position_diff, axis=1)
-        
+
         # Calculate cosine
         cos_theta = dot_product / (velocity_norm * position_norm)
-        
+
         return np.clip(cos_theta, -1.0, 1.0)
 
     def _get_trajectory_data(self, identity: int) -> np.ndarray:
         """Get trajectory data for a specific identity.
-        
+
         Args:
             identity: Mouse identity
-            
+
         Returns:
             np.ndarray: Trajectory array of shape (n_frames, 2)
         """
@@ -174,10 +179,10 @@ class ChasingDetector(EventDetection):
 
     def _calculate_movement_distance(self, trajectory: np.ndarray) -> float:
         """Calculate total movement distance, ignoring NaN values.
-        
+
         Args:
             trajectory: Trajectory array of shape (n_frames, 2)
-            
+
         Returns:
             float: Total movement distance
         """
@@ -186,16 +191,18 @@ class ChasingDetector(EventDetection):
         valid_velocity = velocity[~np.isnan(velocity).any(axis=1)]
         if len(valid_velocity) == 0:
             return 0.0
-        distances = np.sqrt(np.sum(valid_velocity ** 2, axis=1))
+        distances = np.sqrt(np.sum(valid_velocity**2, axis=1))
         return np.sum(distances)
 
-    def _is_valid_frame(self, traj_a_frame: np.ndarray, traj_b_frame: np.ndarray) -> bool:
+    def _is_valid_frame(
+        self, traj_a_frame: np.ndarray, traj_b_frame: np.ndarray
+    ) -> bool:
         """Check if both trajectory frames are valid (not NaN).
-        
+
         Args:
             traj_a_frame: Frame data for trajectory A
             traj_b_frame: Frame data for trajectory B
-            
+
         Returns:
             bool: True if both frames are valid
         """
@@ -220,20 +227,22 @@ class ChasingDetector(EventDetection):
             for j, identity_b in enumerate(identities):
                 if i >= j:  # Avoid duplicate pairs and self-pairs
                     continue
-                 
+
                 traj_a = trajectories[identity_a]
                 traj_b = trajectories[identity_b]
-                
+
                 # Ensure trajectories have same length
                 min_length = min(len(traj_a), len(traj_b))
                 traj_a = traj_a[:min_length]
                 traj_b = traj_b[:min_length]
-                
+
                 # Calculate distances between mice for each frame, handling NaN values
                 distances = []
                 for frame in range(min_length):
                     if self._is_valid_frame(traj_a[frame], traj_b[frame]):
-                        distance = self._calculate_distance(traj_a[frame], traj_b[frame])
+                        distance = self._calculate_distance(
+                            traj_a[frame], traj_b[frame]
+                        )
                         distances.append(distance)
                     else:
                         distances.append(np.nan)
@@ -244,26 +253,30 @@ class ChasingDetector(EventDetection):
                 velocity_b = self._calculate_velocity(traj_b)
 
                 # Sliding window detection
-                for start_frame in range(0, min_length - self.window_size, self.window_size):
+                for start_frame in range(
+                    0, min_length - self.window_size, self.window_size
+                ):
                     end_frame = start_frame + self.window_size
 
                     # Get window data
                     window_distances = distances[start_frame:end_frame]
-                    window_velocity_a = velocity_a[start_frame:end_frame-1]
-                    window_velocity_b = velocity_b[start_frame:end_frame-1]
+                    window_velocity_a = velocity_a[start_frame : end_frame - 1]
+                    window_velocity_b = velocity_b[start_frame : end_frame - 1]
 
                     # Calculate position differences
-                    window_traj_a = traj_a[start_frame:end_frame-1]
-                    window_traj_b = traj_b[start_frame:end_frame-1]
+                    window_traj_a = traj_a[start_frame : end_frame - 1]
+                    window_traj_b = traj_b[start_frame : end_frame - 1]
                     position_diff_ab = window_traj_b - window_traj_a  # A -> B
                     position_diff_ba = window_traj_a - window_traj_b  # B -> A
 
-                                        # Create validity mask for frames without NaN values
-                    valid_frames = np.array([
-                        self._is_valid_frame(window_traj_a[k], window_traj_b[k])
-                        for k in range(len(window_traj_a))
-                    ])
-                    
+                    # Create validity mask for frames without NaN values
+                    valid_frames = np.array(
+                        [
+                            self._is_valid_frame(window_traj_a[k], window_traj_b[k])
+                            for k in range(len(window_traj_a))
+                        ]
+                    )
+
                     # Also check if distances are valid (not NaN) - only for the frames we have velocity data
                     valid_distances = ~np.isnan(window_distances[:-1])
                     valid_frames = valid_frames & valid_distances
@@ -280,12 +293,20 @@ class ChasingDetector(EventDetection):
                         continue
 
                     # Calculate cosine angles only for valid frames
-                    cos_theta_a = self._calculate_cos_theta(window_velocity_a, position_diff_ab)
-                    cos_theta_b = self._calculate_cos_theta(window_velocity_b, position_diff_ba)
+                    cos_theta_a = self._calculate_cos_theta(
+                        window_velocity_a, position_diff_ab
+                    )
+                    cos_theta_b = self._calculate_cos_theta(
+                        window_velocity_b, position_diff_ba
+                    )
 
                     # Calculate escape direction angles (cosϕ)
-                    cos_phi_a = self._calculate_cos_theta(window_velocity_a, -position_diff_ab)
-                    cos_phi_b = self._calculate_cos_theta(window_velocity_b, -position_diff_ba)
+                    cos_phi_a = self._calculate_cos_theta(
+                        window_velocity_a, -position_diff_ab
+                    )
+                    cos_phi_b = self._calculate_cos_theta(
+                        window_velocity_b, -position_diff_ba
+                    )
 
                     # Handle NaN values in cosine calculations
                     valid_cos_theta_a = ~np.isnan(cos_theta_a)
@@ -303,14 +324,17 @@ class ChasingDetector(EventDetection):
                     # Filter out NaN values for cosine calculations
                     valid_cos_theta_a_frames = ~np.isnan(cos_theta_a)
                     valid_cos_theta_b_frames = ~np.isnan(cos_theta_b)
-                    
-                    if np.sum(valid_cos_theta_a_frames) == 0 or np.sum(valid_cos_theta_b_frames) == 0:
+
+                    if (
+                        np.sum(valid_cos_theta_a_frames) == 0
+                        or np.sum(valid_cos_theta_b_frames) == 0
+                    ):
                         continue
-                    
+
                     # Calculate average cosθ for both mice (higher cosθ = more likely to be chaser)
                     avg_cos_theta_a = np.mean(cos_theta_a[valid_cos_theta_a_frames])
                     avg_cos_theta_b = np.mean(cos_theta_b[valid_cos_theta_b_frames])
-                    
+
                     if avg_cos_theta_a > avg_cos_theta_b:
                         # A is chaser (moving towards B), B is chasee
                         chaser_id = identity_a
@@ -334,10 +358,10 @@ class ChasingDetector(EventDetection):
 
                     # Apply chasing criteria (only for valid frames)
                     chasing_conditions = (
-                        (cos_theta_chaser > self.theta_threshold) &     # cosθ > threshold
-                        valid_cos_theta_chaser &    # Valid cosθ calculation
-                        (cos_phi_chasee < self.phi_threshold) &     # cosϕ < threshold
-                        valid_cos_phi_chasee    # Valid cosϕ calculation
+                        (cos_theta_chaser > self.theta_threshold)  # cosθ > threshold
+                        & valid_cos_theta_chaser  # Valid cosθ calculation
+                        & (cos_phi_chasee < self.phi_threshold)  # cosϕ < threshold
+                        & valid_cos_phi_chasee  # Valid cosϕ calculation
                     )
 
                     # Calculate correlation (proportion of valid frames satisfying conditions)
@@ -346,7 +370,9 @@ class ChasingDetector(EventDetection):
                     # Check if correlation exceeds threshold
                     if correlation > self.correlation_threshold:
                         # Find the final valid distance
-                        valid_final_distances = window_distances[~np.isnan(window_distances)]
+                        valid_final_distances = window_distances[
+                            ~np.isnan(window_distances)
+                        ]
                         if len(valid_final_distances) == 0:
                             continue
                         final_distance = valid_final_distances[-1]

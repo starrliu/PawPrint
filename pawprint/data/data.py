@@ -136,6 +136,8 @@ class TrajectoryCollection:
         traj_data = pd.read_csv(trajectory_path, sep=",")
 
         self.identities = [int(col[1:]) for col in traj_data.columns if "x" in col]
+        # Sort the identities
+        self.identities.sort()
         self.trajectories = {}
         for identity in self.identities:
             tmp = {}
@@ -214,12 +216,12 @@ class TrajectoryCollection:
         
         return distances.tolist()
 
-    def to_approach(self, first_identity: int, second_identity: int, threshold: float = 5) -> list:
-        """Calculate approach between two trajectories.
+    def to_proximity(self, first_identity: int, second_identity: int, threshold: float = 5) -> list:
+        """Calculate proximity between two trajectories.
         Args:
             first_identity (int): identity of the first trajectory.
             second_identity (int): identity of the second trajectory.
-            threshold (float, optional): threshold for approach. Defaults to 5 cm.
+            threshold (float, optional): threshold for proximity. Defaults to 5 cm.
         Returns:
             list: indicates whether the distance is less than threshold at each frame.
                 If the distance is NaN, the value is -1.
